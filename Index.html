@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q-Stream Pro | Ejecutable de Gestión de Turnos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;700;900&display=swap');
+        body { 
+            font-family: 'Urbanist', sans-serif; 
+            background-color: #0a0a0b; 
+            color: #f5f5f7; 
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .glass { background: rgba(22, 22, 24, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .accent-text { color: #d4ff3f; }
+        .accent-bg { background-color: #d4ff3f; color: #000; }
+        
+        .call-animation {
+            animation: highlight 1s ease-in-out infinite alternate;
+        }
+        @keyframes highlight {
+            from { transform: scale(1); box-shadow: 0 0 0px transparent; }
+            to { transform: scale(1.02); box-shadow: 0 0 30px rgba(212, 255, 63, 0.4); }
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- PANTALLA DE SELECCIÓN DE ROL (SETUP) -->
+    <div id="setup-screen" class="fixed inset-0 z-50 glass flex items-center justify-center p-6">
+        <div class="max-w-5xl w-full text-center">
+            <div class="mb-10">
+                <h1 class="text-6xl font-black mb-2 italic tracking-tighter">Q-STREAM <span class="accent-text">PRO</span></h1>
+                <p class="text-zinc-500 text-xl font-medium">Arquitectura de Sincronización en Tiempo Real</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- ROL KIOSKO -->
+                <div class="glass p-10 rounded-[3rem] border-2 border-transparent hover:border-[#d4ff3f] transition-all group flex flex-col items-center">
+                    <div class="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-6 group-hover:bg-[#d4ff3f]/10 transition-colors">
+                        <i class="fas fa-user-plus text-4xl group-hover:text-[#d4ff3f]"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3">Kiosko</h3>
+                    <p class="text-sm text-zinc-500 mb-8">Uso en tablet o recepción para asignar nuevos turnos.</p>
+                    <button onclick="initApp('kiosk')" class="w-full py-4 accent-bg rounded-2xl font-black text-sm uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all">Seleccionar</button>
+                </div>
+                
+                <!-- ROL CAJERO (STATION) -->
+                <div class="glass p-10 rounded-[3rem] border-2 border-transparent hover:border-[#d4ff3f] transition-all group flex flex-col items-center">
+                    <div class="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-6 group-hover:bg-[#d4ff3f]/10 transition-colors">
+                        <i class="fas fa-headset text-4xl group-hover:text-[#d4ff3f]"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3">Estación Cajero</h3>
+                    <p class="text-sm text-zinc-500 mb-8">Equipos del personal para llamar y atender clientes.</p>
+                    <div class="flex gap-3 w-full">
+                        <button onclick="initApp('staff', 'Cajero 1')" class="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 transition-all">Cajero 1</button>
+                        <button onclick="initApp('staff', 'Cajero 2')" class="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl font-bold text-xs uppercase hover:bg-white/10 transition-all">Cajero 2</button>
+                    </div>
+                </div>
+
+                <!-- ROL MONITOR -->
+                <div class="glass p-10 rounded-[3rem] border-2 border-transparent hover:border-[#d4ff3f] transition-all group flex flex-col items-center">
+                    <div class="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-6 group-hover:bg-[#d4ff3f]/10 transition-colors">
+                        <i class="fas fa-desktop text-4xl group-hover:text-[#d4ff3f]"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-3">Monitor</h3>
+                    <p class="text-sm text-zinc-500 mb-8">Pantalla para el público con anuncios de audio y visuales.</p>
+                    <button onclick="initApp('monitor')" class="w-full py-4 accent-bg rounded-2xl font-black text-sm uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all">Seleccionar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR DE LA APLICACIÓN -->
+    <main id="app-container" class="hidden flex-grow flex flex-col">
+        <nav class="p-6 border-b border-white/5 flex justify-between items-center glass">
+            <div class="text-2xl font-black italic">Q-STREAM <span class="accent-text">PRO</span></div>
+            <div class="flex items-center gap-6">
+                <div id="status-indicator" class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                    <div id="conn-dot" class="w-2 h-2 rounded-full bg-zinc-600"></div> <span id="conn-text">Conectando...</span>
+                </div>
+                <div id="role-display" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold uppercase tracking-tighter text-white"></div>
+                <button onclick="location.reload()" class="w-10 h-10 rounded-xl hover:bg-white/5 transition-colors flex items-center justify-center text-white">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <div id="module-content" class="flex-grow p-8 flex flex-col overflow-hidden">
+            <!-- El contenido se carga vía JavaScript -->
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getFirestore, collection, doc, addDoc, onSnapshot, query, deleteDoc, setDoc, getDoc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'shared-drive-sync';
+
+        let currentRole = '';
+        let stationId = '';
+        let currentQueue = [];
+        let currentStatus = null;
+        let lastCalledTurnId = null;
+        let isAuthReady = false;
+
+        window.initApp = async (role, name = '') => {
+            currentRole = role;
+            stationId = name;
+            
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('app-container').classList.remove('hidden');
+            document.getElementById('role-display').innerText = name || role;
+
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Error en Auth:", err);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                isAuthReady = true;
+                document.getElementById('conn-dot').className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                document.getElementById('conn-text').innerText = "Sincronizado";
+                initSync();
+            } else {
+                isAuthReady = false;
+                document.getElementById('conn-dot').className = "w-2 h-2 rounded-full bg-rose-500";
+                document.getElementById('conn-text').innerText = "Desconectado";
+            }
+        });
+
+        function initSync() {
+            if (!isAuthReady) return;
+
+            const queueRef = collection(db, 'artifacts', appId, 'public', 'data', 'queue');
+            const statusRef = doc(db, 'artifacts', appId, 'public', 'data', 'status', 'current');
+            
+            // Listener para la cola (todos los roles necesitan esto)
+            onSnapshot(query(queueRef), (snapshot) => {
+                currentQueue = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .sort((a, b) => {
+                        if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1;
+                        const timeA = a.createdAt?.seconds || a.localTimestamp || 0;
+                        const timeB = b.createdAt?.seconds || b.localTimestamp || 0;
+                        return timeA - timeB;
+                    });
+                renderCurrentRoleView();
+            }, (error) => {
+                console.error("Error en Snapshot de Cola:", error);
+            });
+
+            // Listener para el estado actual (llamados)
+            onSnapshot(statusRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    currentStatus = docSnap.data();
+                    if (currentRole === 'monitor') {
+                        renderMonitor(currentStatus);
+                        if (currentStatus.callId !== lastCalledTurnId) {
+                            lastCalledTurnId = currentStatus.callId;
+                            announceTurn(currentStatus);
+                        }
+                    } else {
+                        renderCurrentRoleView();
+                    }
+                } else {
+                    // Estado vacío inicial
+                    currentStatus = { number: '---', name: 'ESPERANDO...', station: '---' };
+                    if (currentRole === 'monitor') renderMonitor(currentStatus);
+                }
+            }, (error) => {
+                console.error("Error en Snapshot de Monitor:", error);
+            });
+        }
+
+        function renderCurrentRoleView() {
+            const container = document.getElementById('module-content');
+            if (!container) return;
+            
+            if (currentRole === 'kiosk') renderKiosk(container);
+            else if (currentRole === 'staff') renderStaff(container);
+            else if (currentRole === 'monitor' && currentStatus) renderMonitor(currentStatus);
+        }
+
+        function renderKiosk(el) {
+            el.innerHTML = '';
+            el.className = "flex-grow flex items-center justify-center max-w-2xl mx-auto w-full";
+            const div = document.createElement('div');
+            div.className = "glass p-12 rounded-[3.5rem] w-full border-t-8 border-[#d4ff3f]";
+            div.innerHTML = `
+                <h2 class="text-4xl font-black mb-10 text-center italic tracking-tight text-white">BIENVENIDO</h2>
+                <div class="space-y-8">
+                    <div class="flex flex-col gap-3">
+                        <label class="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-black">Nombre del Cliente</label>
+                        <input id="name-in" type="text" placeholder="Ingrese su nombre" class="bg-white/5 border border-white/10 p-6 rounded-2xl text-2xl outline-none focus:border-[#d4ff3f] transition-all text-white text-center">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 h-40">
+                        <button onclick="window.issueTurn(false)" class="bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 flex flex-col items-center justify-center transition-all group">
+                            <span class="text-xl font-black mb-1 text-white">REGULAR</span>
+                            <i class="fas fa-user text-zinc-600 group-hover:text-white transition-colors text-2xl"></i>
+                        </button>
+                        <button onclick="window.issueTurn(true)" class="accent-bg rounded-3xl flex flex-col items-center justify-center hover:scale-[1.03] transition-all">
+                            <span class="text-xl font-black mb-1">PREFERENCIAL</span>
+                            <i class="fas fa-heart text-black/50 text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            el.appendChild(div);
+        }
+
+        function renderStaff(el) {
+            el.innerHTML = '';
+            el.className = "grid grid-cols-1 lg:grid-cols-3 gap-8 h-full";
+            el.innerHTML = `
+                <div class="lg:col-span-2 flex flex-col gap-6">
+                    <div class="glass rounded-[3rem] flex-grow flex flex-col items-center justify-center text-center p-12">
+                        <h2 class="text-3xl font-black mb-12 italic opacity-40 uppercase tracking-widest text-white">${stationId}</h2>
+                        <button onclick="window.nextTurn()" class="group relative">
+                            <div class="absolute inset-0 bg-[#d4ff3f] blur-3xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                            <div class="relative w-80 h-80 rounded-full accent-bg flex flex-col items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all">
+                                <i class="fas fa-bullhorn text-5xl mb-4"></i>
+                                <span class="text-4xl font-black italic">LLAMAR</span>
+                                <span class="text-xs font-bold mt-2 opacity-60">SIGUIENTE EN FILA</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                <div class="glass rounded-[2.5rem] p-8 flex flex-col overflow-hidden border border-white/10">
+                    <h3 class="text-xl font-black mb-6 italic flex items-center gap-3 text-white">
+                        <i class="fas fa-users-viewfinder accent-text"></i> EN ESPERA (${currentQueue.length})
+                    </h3>
+                    <div class="space-y-4 overflow-y-auto pr-2">
+                        ${currentQueue.map(t => `
+                            <div class="p-5 rounded-2xl flex justify-between items-center ${t.isPriority ? 'bg-rose-500/10 border border-rose-500/20' : 'bg-white/5 border border-white/10'}">
+                                <div>
+                                    <div class="text-2xl font-black ${t.isPriority ? 'text-rose-500' : 'accent-text'} italic">${t.number}</div>
+                                    <div class="text-xs font-bold uppercase tracking-widest opacity-40 text-white">${t.name}</div>
+                                </div>
+                                ${t.isPriority ? '<span class="bg-rose-500 text-black text-[8px] font-black px-2 py-1 rounded">PRIO</span>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderMonitor(data) {
+            const container = document.getElementById('module-content');
+            if (!container) return;
+            container.innerHTML = '';
+            container.className = "flex-grow flex flex-col lg:flex-row gap-8 overflow-hidden";
+            container.innerHTML = `
+                <div class="flex-grow glass rounded-[4rem] border-[10px] border-[#d4ff3f] flex flex-col items-center justify-center p-20 text-center shadow-[inset_0_0_100px_rgba(0,0,0,0.5)]">
+                    <div class="text-zinc-500 text-3xl font-black italic uppercase tracking-[0.3em] mb-10 opacity-50">Llamando Ahora</div>
+                    <div class="text-[280px] font-black accent-text leading-none mb-10 drop-shadow-[0_20px_50px_rgba(212,255,63,0.5)]">${data.number || '---'}</div>
+                    <div class="text-7xl font-bold uppercase mb-16 text-white">${data.name || '---'}</div>
+                    <div class="bg-white/5 px-16 py-6 rounded-full text-5xl font-black border border-white/10 text-white">
+                        DIRÍJASE A: <span class="accent-text italic ml-4">${data.station || '---'}</span>
+                    </div>
+                </div>
+                <div class="w-full lg:w-[450px] flex flex-col gap-6">
+                    <div class="glass rounded-[3rem] p-8 flex-grow">
+                        <h3 class="text-2xl font-black italic text-center mb-10 border-b border-white/10 pb-6 opacity-30 text-white">PRÓXIMOS TURNOS</h3>
+                        <div class="space-y-6">
+                            ${currentQueue.slice(0, 5).map(t => `
+                                <div class="flex items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/10">
+                                    <span class="text-5xl font-black italic ${t.isPriority ? 'text-rose-500' : 'accent-text'}">${t.number}</span>
+                                    <span class="text-sm font-bold opacity-30 uppercase text-right leading-tight text-white">${t.name}</span>
+                                </div>
+                            `).join('')}
+                            ${currentQueue.length === 0 ? '<div class="text-center opacity-20 py-10 font-bold uppercase tracking-widest text-white">No hay nadie en fila</div>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.issueTurn = async (isPriority) => {
+            if (!isAuthReady) return;
+            const n = document.getElementById('name-in');
+            if (!n || !n.value) {
+                n.classList.add('border-rose-500');
+                setTimeout(() => n.classList.remove('border-rose-500'), 1000);
+                return;
+            }
+
+            try {
+                const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'counters', 'turns');
+                
+                await runTransaction(db, async (transaction) => {
+                    const counterDoc = await transaction.get(counterRef);
+                    let lastNumber = 0;
+                    
+                    if (counterDoc.exists()) {
+                        lastNumber = counterDoc.data().current || 0;
+                    }
+                    
+                    const nextNumber = lastNumber + 1;
+                    const paddedNumber = String(nextNumber).padStart(3, '0');
+                    const turnLabel = (isPriority ? 'P' : 'R') + '-' + paddedNumber;
+
+                    const queueRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'queue'));
+                    
+                    transaction.set(counterRef, { current: nextNumber });
+                    transaction.set(queueRef, {
+                        number: turnLabel,
+                        name: n.value.toUpperCase(),
+                        isPriority,
+                        createdAt: serverTimestamp(),
+                        localTimestamp: Date.now()
+                    });
+                });
+                
+                n.value = '';
+            } catch (err) {
+                console.error("Error al emitir turno secuencial:", err);
+            }
+        };
+
+        window.nextTurn = async () => {
+            if (!isAuthReady || currentQueue.length === 0) return;
+            const next = currentQueue[0];
+            
+            try {
+                const statusRef = doc(db, 'artifacts', appId, 'public', 'data', 'status', 'current');
+                await setDoc(statusRef, {
+                    number: next.number,
+                    name: next.name,
+                    station: stationId,
+                    callId: next.id,
+                    timestamp: Date.now()
+                });
+
+                const docToDelete = doc(db, 'artifacts', appId, 'public', 'data', 'queue', next.id);
+                await deleteDoc(docToDelete);
+            } catch (err) {
+                console.error("Error al llamar siguiente:", err);
+            }
+        };
+
+        function announceTurn(data) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = 660;
+                gain.gain.value = 0.1;
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+
+                setTimeout(() => {
+                    const speech = new SpeechSynthesisUtterance();
+                    speech.text = `Turno ${data.number}. ${data.name}. Favor acercarse a la ${data.station}`;
+                    speech.lang = 'es-CO';
+                    speech.rate = 0.95;
+                    speech.pitch = 1.1;
+                    window.speechSynthesis.speak(speech);
+                }, 600);
+            } catch (e) {
+                console.warn("Audio bloqueado:", e);
+            }
+        }
+
+    </script>
+</body>
+</html>
